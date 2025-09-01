@@ -9,7 +9,6 @@ dependencies:
   - pytables
   - dask==2024.8.2
   - dask-jobqueue
-  - coffea
   - black
   - root
   - delphes
@@ -17,3 +16,5 @@ dependencies:
   - pip:
     - coffea[dask]
     - six
+    - quickstats
+    - aliad

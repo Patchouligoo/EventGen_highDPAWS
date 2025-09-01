@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 action() {
-    # Set version of used software
-    local madgraph_download_dir="https://launchpad.net/mg5amcnlo/3.0/3.6.x/+download"
-    local madgraph_download_file="MG5_aMC_v3.5.9"
 
     # Set main directories
     local shell_is_zsh="$( [ -z "${ZSH_VERSION}" ] && echo "false" || echo "true" )"
@@ -11,6 +8,8 @@ action() {
 
     # set PYTHONPATH
     export PYTHONPATH="${this_dir}:${PYTHONPATH}"
+
+    ENV_PATH=/global/cfs/cdirs/m3246/highD_PAWS/eventgen
 
     CONFIG_FILE="${this_dir}/.config"
 
@@ -59,43 +58,23 @@ action() {
     export SOFTWARE_DIR="${this_dir}/software"
     mkdir -p $SOFTWARE_DIR
 
-    export MADGRAPH_DIR="${SOFTWARE_DIR}/${madgraph_download_file//./_}"
-
     # If no conda available, activate it
     if ! command -v conda >/dev/null 2>&1; then
         module load python
     fi
 
-    # If conda env "madgraph" does not exist create it
-    if ! conda env list | grep -q '^madgraph'; then
-        mamba create --name madgraph
-        mamba env update -n madgraph --file madgraph.yml -y
-    fi
-
     # If conda env "eventgen" does not exist create it
     if ! conda env list | grep -q '^eventgen'; then
-        mamba create --name eventgen
-        mamba env update -n eventgen --file eventgen.yml -y
+        mamba create -p "$ENV_PATH"
+        mamba env update -p "$ENV_PATH" --file eventgen.yml
     fi
 
     # Activate conda environment eventgen
-    conda activate madgraph
+    conda activate "$ENV_PATH"
 
     # law setup
     source "$( law completion )" ""
 
-    # If Pythia not installed yet, do so
-    if [ -d "$MADGRAPH_DIR" ]; then
-        echo "Madgraph already installed"
-    else
-        echo "Installing Madgraph"
-        cd $SOFTWARE_DIR
-        wget ${madgraph_download_dir}/${madgraph_download_file}.tar.gz
-        tar -xf "${madgraph_download_file}.tar.gz"
-        rm "${madgraph_download_file}.tar.gz"
-        
-        cd $this_dir
-    fi
 
     export PYTHIA_DIR="${CONDA_PREFIX}"
     export DELPHES_DIR="${CONDA_PREFIX}"
