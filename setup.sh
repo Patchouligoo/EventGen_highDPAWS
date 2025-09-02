@@ -64,7 +64,7 @@ action() {
     fi
 
     # If conda env "eventgen" does not exist create it
-    if ! conda env list | grep -q '^eventgen'; then
+    if ! conda info --envs | grep -q "$ENV_PATH"; then
         mamba create -p "$ENV_PATH"
         mamba env update -p "$ENV_PATH" --file eventgen.yml
     fi
