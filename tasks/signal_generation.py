@@ -74,6 +74,10 @@ class DetectorMixin:
 class NEventsMixin:
     n_events = luigi.IntParameter(default=1000)
 
+    def store_parts(self):
+        sp = super().store_parts()
+        return sp + (f"n_events_{self.n_events}",)
+
 
 class PythiaConfig(ProcessMixin, BaseTask):
 
@@ -208,6 +212,8 @@ class DelphesPythia8(
 
 
 class DelphesPythia8ROOTtoTXT(NEventsMixin, ProcessMixin, BaseTask):
+
+    cluster_mode = luigi.ChoiceParameter(choices=["local", "slurm"], default="local")
 
     def requires(self):
         return DelphesPythia8.req(self)
