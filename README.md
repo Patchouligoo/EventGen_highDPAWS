@@ -13,7 +13,14 @@ Also it activates the software environment and sets the necessary environment va
 
 ## Run:
 
-to generate signals
+to generate signals at one mass
 ```
 law run DelphesPythia8TXTtoH5 --version eventgen_test_0 --mx 300 --my 300 --process qq --n-events 1000 --cluster-mode slurm (or local)
 ```
+
+to generate all signal mass grids used in PAWS study, run
+
+```
+law run GenerateSignalsAllMass --version eventgen_test_0 --process qq --n-events 500000 --cluster-mode slurm --workers 100
+```
+needs to be run on perlmutter cpu node with slurm

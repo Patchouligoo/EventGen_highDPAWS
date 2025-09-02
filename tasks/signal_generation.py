@@ -6,6 +6,7 @@ import shutil
 import luigi
 import law
 import pandas as pd
+import numpy as np
 
 from matplotlib import pyplot as plt
 import dask
@@ -292,3 +293,43 @@ class DelphesPythia8TXTtoH5(NEventsMixin, ProcessMixin, BaseTask):
 
         self.output().parent.touch()
         df.to_hdf(self.output().path, key="output", mode="w")
+
+
+class GenerateSignalsAllMass(
+    NEventsMixin,
+    DecayChannelMixin,
+    BaseTask,
+):
+    feature_level = luigi.ChoiceParameter(
+        choices=["low_level", "high_level"], default="low_level"
+    )
+    pad_size = luigi.IntParameter(default=200)
+
+    cluster_mode = luigi.ChoiceParameter(choices=["local", "slurm"], default="local")
+
+    mx_values = np.linspace(50, 600, 12)
+    my_values = np.linspace(50, 600, 12)
+
+    def requires(self):
+        reqs = {}
+        for mx in self.mx_values:
+            for my in self.my_values:
+                req = DelphesPythia8TXTtoH5.req(
+                    self,
+                    mx=mx,
+                    my=my,
+                )
+                key = f"mx_{mx}_my_{my}"
+                reqs[key] = req
+        return reqs
+
+    def output(self):
+        return self.local_directory_target(f"job_status.txt")
+
+    @law.decorator.safe_output
+    def run(self):
+
+        print("All tasks finished")
+        self.output().parent.touch()
+        with open(self.output().path, "w") as f:
+            f.write("All tasks finished\n")
