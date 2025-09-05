@@ -12,6 +12,7 @@ dependencies:
   - black
   - root
   - delphes
+  - h5py
   - pip
   - pip:
     - coffea[dask]
