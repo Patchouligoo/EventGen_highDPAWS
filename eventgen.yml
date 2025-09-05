@@ -19,3 +19,5 @@ dependencies:
     - six
     - quickstats
     - aliad
+    - energyflow
+    - fastjet
