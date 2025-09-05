@@ -246,7 +246,7 @@ class DelphesPythia8TXTtoH5(NEventsMixin, ProcessMixin, BaseTask):
     feature_level = luigi.ChoiceParameter(
         choices=["low_level", "high_level"], default="low_level"
     )
-    pad_size = luigi.IntParameter(default=200)
+    pad_size = luigi.IntParameter(default=150)
 
     cluster_mode = luigi.ChoiceParameter(choices=["local", "slurm"], default="local")
 
@@ -295,41 +295,67 @@ class DelphesPythia8TXTtoH5(NEventsMixin, ProcessMixin, BaseTask):
         df.to_hdf(self.output().path, key="output", mode="w")
 
 
-class GenerateSignalsAllMass(
-    NEventsMixin,
-    DecayChannelMixin,
-    BaseTask,
-):
-    feature_level = luigi.ChoiceParameter(
-        choices=["low_level", "high_level"], default="low_level"
-    )
-    pad_size = luigi.IntParameter(default=200)
+class OmniLearnSignalPrep(NEventsMixin, ProcessMixin, BaseTask):
+    pad_size = luigi.IntParameter(default=150)
 
     cluster_mode = luigi.ChoiceParameter(choices=["local", "slurm"], default="local")
 
-    mx_values = np.linspace(50, 600, 12)
-    my_values = np.linspace(50, 600, 12)
+    def store_parts(self):
+        return super().store_parts() + (f"constituent_pad_{self.pad_size}",)
 
     def requires(self):
-        reqs = {}
-        for mx in self.mx_values:
-            for my in self.my_values:
-                req = DelphesPythia8TXTtoH5.req(
-                    self,
-                    mx=mx,
-                    my=my,
-                )
-                key = f"mx_{mx}_my_{my}"
-                reqs[key] = req
-        return reqs
+        return DelphesPythia8TXTtoH5.req(
+            self, feature_level="low_level", pad_size=self.pad_size
+        )
 
     def output(self):
-        return self.local_directory_target(f"job_status.txt")
+        return self.local_target(
+            f"processed_data_signal_{self.process}_{self.mx}_{self.my}.h5"
+        )
 
     @law.decorator.safe_output
     def run(self):
+        from data_processing.signal_processing import signal_prep
 
-        print("All tasks finished")
         self.output().parent.touch()
-        with open(self.output().path, "w") as f:
-            f.write("All tasks finished\n")
+        signal_prep(self.input().path, self.output().path, self.pad_size)
+
+
+# class GenerateSignalsAllMass(
+#     NEventsMixin,
+#     DecayChannelMixin,
+#     BaseTask,
+# ):
+#     feature_level = luigi.ChoiceParameter(
+#         choices=["low_level", "high_level"], default="low_level"
+#     )
+#     pad_size = luigi.IntParameter(default=150)
+
+#     cluster_mode = luigi.ChoiceParameter(choices=["local", "slurm"], default="local")
+
+#     mx_values = np.linspace(50, 600, 12)
+#     my_values = np.linspace(50, 600, 12)
+
+#     def requires(self):
+#         reqs = {}
+#         for mx in self.mx_values:
+#             for my in self.my_values:
+#                 req = DelphesPythia8TXTtoH5.req(
+#                     self,
+#                     mx=mx,
+#                     my=my,
+#                 )
+#                 key = f"mx_{mx}_my_{my}"
+#                 reqs[key] = req
+#         return reqs
+
+#     def output(self):
+#         return self.local_directory_target(f"job_status.txt")
+
+#     @law.decorator.safe_output
+#     def run(self):
+
+#         print("All tasks finished")
+#         self.output().parent.touch()
+#         with open(self.output().path, "w") as f:
+#             f.write("All tasks finished\n")
