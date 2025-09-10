@@ -6,7 +6,9 @@ from scipy.stats import norm
 from data_processing.utils import get_dijetmass, get_mjj_mask
 
 
-def signal_prep(inputpath, outputpath, pad_size):
+def signal_prep(
+    inputpath, output_dict, pad_size, num_sig_for_data=30000, num_sig_for_mc=50000
+):
     """
     Output of signal from Delphes has format in h5 file:
     pxj1, pyj1, ...., tau23j1, pxj2, pyj2, ...., tau23j2, mjj, ptjj, ptj1p1, ptj1p2, ..., etaj1p1, ..., deltaRj2pN
@@ -149,14 +151,26 @@ def signal_prep(inputpath, outputpath, pad_size):
     constituents = constituents[indices]
     dijet_mass = dijet_mass[indices]
 
-    events_to_keep = 50000
+    # if num of events is less than required, raise error
+    if jet_data.shape[0] < num_sig_for_data + num_sig_for_mc:
+        raise ValueError(
+            f"Number of events in {inputpath} is less than required {num_sig_for_data + num_sig_for_mc}"
+        )
 
-    jet_data = jet_data[:events_to_keep]
-    constituents = constituents[:events_to_keep]
-    dijet_mass = dijet_mass[:events_to_keep]
+    # save for signals in data
+    jet_data = jet_data[:num_sig_for_data]
+    constituents = constituents[:num_sig_for_data]
+    dijet_mass = dijet_mass[:num_sig_for_data]
+    with h5py.File(output_dict["signals_for_data"].path, "w") as hf:
+        hf.create_dataset("constituents", data=constituents)
+        hf.create_dataset("global", data=jet_data)
+        hf.create_dataset("condition", data=dijet_mass)
 
-    # save to outputpath
-    with h5py.File(outputpath, "w") as hf:
+    # save for signals in mc
+    jet_data = jet_data[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
+    constituents = constituents[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
+    dijet_mass = dijet_mass[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
+    with h5py.File(output_dict["signals_for_mc"].path, "w") as hf:
         hf.create_dataset("constituents", data=constituents)
         hf.create_dataset("global", data=jet_data)
         hf.create_dataset("condition", data=dijet_mass)

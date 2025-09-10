@@ -135,7 +135,7 @@ class DelphesPythia8(
     # SLURM Configuration
     cores = 1
     memory = "1GB"
-    walltime = "24:00:00"
+    walltime = "3:00:00"
     qos = "shared"
 
     def output(self):
@@ -210,6 +210,45 @@ class DelphesPythia8(
         cluster.scale(0)
         client.close()
         cluster.close()
+
+
+class SubmitSignalsAllMass(
+    NEventsMixin,
+    DecayChannelMixin,
+    BaseTask,
+):
+    feature_level = luigi.ChoiceParameter(
+        choices=["low_level", "high_level"], default="low_level"
+    )
+
+    cluster_mode = luigi.ChoiceParameter(choices=["local", "slurm"], default="slurm")
+
+    mx_values = np.linspace(50, 600, 12)
+    my_values = np.linspace(50, 600, 12)
+
+    def requires(self):
+        reqs = {}
+        for mx in self.mx_values:
+            for my in self.my_values:
+                req = DelphesPythia8.req(
+                    self,
+                    mx=mx,
+                    my=my,
+                )
+                key = f"mx_{mx}_my_{my}"
+                reqs[key] = req
+        return reqs
+
+    def output(self):
+        return self.local_directory_target(f"job_status.txt")
+
+    @law.decorator.safe_output
+    def run(self):
+
+        print("All tasks finished")
+        self.output().parent.touch()
+        with open(self.output().path, "w") as f:
+            f.write("All tasks finished\n")
 
 
 class DelphesPythia8ROOTtoTXT(NEventsMixin, ProcessMixin, BaseTask):
@@ -309,53 +348,24 @@ class OmniLearnSignalPrep(NEventsMixin, ProcessMixin, BaseTask):
         )
 
     def output(self):
-        return self.local_target(
-            f"processed_data_signal_{self.process}_{self.mx}_{self.my}.h5"
-        )
+        return {
+            "signals_for_mc": self.local_target(
+                f"mc_signal_{self.process}_{self.mx}_{self.my}.h5"
+            ),  # representing the signal MC simulation, take 50k events
+            "signals_for_data": self.local_target(
+                f"data_signal_{self.process}_{self.mx}_{self.my}.h5"
+            ),  # use as signals in pseudo data, take 30k events
+        }
 
     @law.decorator.safe_output
     def run(self):
         from data_processing.signal_processing import signal_prep
 
-        self.output().parent.touch()
-        signal_prep(self.input().path, self.output().path, self.pad_size)
-
-
-# class GenerateSignalsAllMass(
-#     NEventsMixin,
-#     DecayChannelMixin,
-#     BaseTask,
-# ):
-#     feature_level = luigi.ChoiceParameter(
-#         choices=["low_level", "high_level"], default="low_level"
-#     )
-#     pad_size = luigi.IntParameter(default=150)
-
-#     cluster_mode = luigi.ChoiceParameter(choices=["local", "slurm"], default="local")
-
-#     mx_values = np.linspace(50, 600, 12)
-#     my_values = np.linspace(50, 600, 12)
-
-#     def requires(self):
-#         reqs = {}
-#         for mx in self.mx_values:
-#             for my in self.my_values:
-#                 req = DelphesPythia8TXTtoH5.req(
-#                     self,
-#                     mx=mx,
-#                     my=my,
-#                 )
-#                 key = f"mx_{mx}_my_{my}"
-#                 reqs[key] = req
-#         return reqs
-
-#     def output(self):
-#         return self.local_directory_target(f"job_status.txt")
-
-#     @law.decorator.safe_output
-#     def run(self):
-
-#         print("All tasks finished")
-#         self.output().parent.touch()
-#         with open(self.output().path, "w") as f:
-#             f.write("All tasks finished\n")
+        self.output()["signals_for_data"].parent.touch()
+        signal_prep(
+            self.input().path,
+            self.output(),
+            self.pad_size,
+            num_sig_for_data=30000,
+            num_sig_for_mc=50000,
+        )

@@ -21,6 +21,6 @@ law run DelphesPythia8TXTtoH5 --version eventgen_test_0 --mx 300 --my 300 --proc
 to generate all signal mass grids used in PAWS study, run
 
 ```
-law run GenerateSignalsAllMass --version eventgen_test_0 --process qq --n-events 500000 --cluster-mode slurm --workers 100
+law run SubmitSignalsAllMass --version eventgen_test_0 --process qq --n-events 500000 --cluster-mode slurm --workers 144
 ```
 needs to be run on perlmutter cpu node with slurm

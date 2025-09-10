@@ -6,3 +6,4 @@ output
 py.py
 .law
 .vscode
+*.out
