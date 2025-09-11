@@ -13,14 +13,21 @@ Also it activates the software environment and sets the necessary environment va
 
 ## Run:
 
-to generate signals at one mass
+To generate signals at one mass
 ```
-law run DelphesPythia8TXTtoH5 --version eventgen_test_0 --mx 300 --my 300 --process qq --n-events 1000 --cluster-mode slurm (or local)
+law run OmniLearnSignalPrep --version eventgen_production --mx 300 --my 300 --process qq --n-events 1000 --cluster-mode slurm (or local)
 ```
 
-to generate all signal mass grids used in PAWS study, run
+To generate all signal mass grids used in PAWS study
 
+first run
 ```
-law run SubmitSignalsAllMass --version eventgen_test_0 --process qq --n-events 500000 --cluster-mode slurm --workers 144
+law run SubmitSignalsAllMass --version eventgen_production --process qq --n-events 500000 --cluster-mode slurm --workers 144
 ```
-needs to be run on perlmutter cpu node with slurm
+needs to be run on perlmutter cpu node with slurm. This will do all the delphes + pythia works to get root files
+
+then run
+```
+law run OmniLearnSignalPrepAllMass --version eventgen_production --process qq --n-events 500000 --workers 10 
+```
+to further process outputs in Ominlearn format

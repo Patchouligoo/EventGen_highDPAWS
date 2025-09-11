@@ -369,3 +369,40 @@ class OmniLearnSignalPrep(NEventsMixin, ProcessMixin, BaseTask):
             num_sig_for_data=30000,
             num_sig_for_mc=50000,
         )
+
+class OmniLearnSignalPrepAllMass(
+    NEventsMixin,
+    DecayChannelMixin,
+    BaseTask,
+):
+    pad_size = luigi.IntParameter(default=150)
+
+    cluster_mode = luigi.ChoiceParameter(choices=["local", "slurm"], default="local")
+
+    mx_values = np.linspace(50, 600, 12)
+    my_values = np.linspace(50, 600, 12)
+
+    def requires(self):
+        reqs = {}
+        for mx in self.mx_values:
+            for my in self.my_values:
+                req = OmniLearnSignalPrep.req(
+                    self,
+                    mx=mx,
+                    my=my,
+                    pad_size=self.pad_size,
+                )
+                key = f"mx_{mx}_my_{my}"
+                reqs[key] = req
+        return reqs
+
+    def output(self):
+        return self.local_directory_target(f"job_status.txt")
+
+    @law.decorator.safe_output
+    def run(self):
+
+        print("All tasks finished")
+        self.output().parent.touch()
+        with open(self.output().path, "w") as f:
+            f.write("All tasks finished\n") 
