@@ -158,19 +158,19 @@ def signal_prep(
         )
 
     # save for signals in data
-    jet_data = jet_data[:num_sig_for_data]
-    constituents = constituents[:num_sig_for_data]
-    dijet_mass = dijet_mass[:num_sig_for_data]
+    jet_data_for_data = jet_data[:num_sig_for_data]
+    constituents_for_data = constituents[:num_sig_for_data]
+    dijet_mass_for_data = dijet_mass[:num_sig_for_data]
     with h5py.File(output_dict["signals_for_data"].path, "w") as hf:
-        hf.create_dataset("constituents", data=constituents)
-        hf.create_dataset("global", data=jet_data)
-        hf.create_dataset("condition", data=dijet_mass)
+        hf.create_dataset("constituents", data=constituents_for_data)
+        hf.create_dataset("global", data=jet_data_for_data)
+        hf.create_dataset("condition", data=dijet_mass_for_data)
 
     # save for signals in mc
-    jet_data = jet_data[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
-    constituents = constituents[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
-    dijet_mass = dijet_mass[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
+    jet_data_for_mc = jet_data[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
+    constituents_for_mc = constituents[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
+    dijet_mass_for_mc = dijet_mass[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
     with h5py.File(output_dict["signals_for_mc"].path, "w") as hf:
-        hf.create_dataset("constituents", data=constituents)
-        hf.create_dataset("global", data=jet_data)
-        hf.create_dataset("condition", data=dijet_mass)
+        hf.create_dataset("constituents", data=constituents_for_mc)
+        hf.create_dataset("global", data=jet_data_for_mc)
+        hf.create_dataset("condition", data=dijet_mass_for_mc)
