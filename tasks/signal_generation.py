@@ -343,9 +343,14 @@ class OmniLearnSignalPrep(NEventsMixin, ProcessMixin, BaseTask):
         return super().store_parts() + (f"constituent_pad_{self.pad_size}",)
 
     def requires(self):
-        return DelphesPythia8TXTtoH5.req(
-            self, feature_level="low_level", pad_size=self.pad_size
-        )
+        return {
+            "low_level": DelphesPythia8TXTtoH5.req(
+                self, feature_level="low_level", pad_size=self.pad_size
+            ),
+            "high_level": DelphesPythia8TXTtoH5.req(
+                self, feature_level="high_level", pad_size=self.pad_size
+            ),
+        }
 
     def output(self):
         return {
@@ -363,12 +368,13 @@ class OmniLearnSignalPrep(NEventsMixin, ProcessMixin, BaseTask):
 
         self.output()["signals_for_data"].parent.touch()
         signal_prep(
-            self.input().path,
+            self.input(),
             self.output(),
             self.pad_size,
             num_sig_for_data=30000,
             num_sig_for_mc=50000,
         )
+
 
 class OmniLearnSignalPrepAllMass(
     NEventsMixin,
@@ -405,4 +411,4 @@ class OmniLearnSignalPrepAllMass(
         print("All tasks finished")
         self.output().parent.touch()
         with open(self.output().path, "w") as f:
-            f.write("All tasks finished\n") 
+            f.write("All tasks finished\n")

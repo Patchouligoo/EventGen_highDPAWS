@@ -3,7 +3,11 @@ import numpy as np
 import h5py
 import awkward as ak
 from scipy.stats import norm
-from data_processing.utils import get_dijetmass, get_mjj_mask
+from data_processing.utils import (
+    get_dijetmass,
+    get_mjj_mask,
+    process_highlevel_features,
+)
 
 
 def signal_prep(
@@ -24,7 +28,11 @@ def signal_prep(
     Convert the format
     """
 
-    input_df = pd.read_hdf(inputpath)
+    # --------------- process high level features ---------------
+    highlevel_features = process_highlevel_features(inputpath["high_level"].path)
+
+    # --------------- process low level features ---------------
+    input_df = pd.read_hdf(inputpath["low_level"].path)
 
     # first create jet_data
     jet_data = input_df[
@@ -125,6 +133,7 @@ def signal_prep(
     print("after preprocessing:")
     print("jets shape: ", jet_data.shape)
     print("constituents shape: ", constituents.shape)
+    print("highlevel features shape: ", highlevel_features.shape)
 
     dijet_mass = get_dijetmass(jet_data)
     mask_region = get_mjj_mask(dijet_mass)
@@ -132,10 +141,12 @@ def signal_prep(
     jet_data = jet_data[mask_region]
     constituents = constituents[mask_region]
     dijet_mass = dijet_mass[mask_region]
+    highlevel_features = highlevel_features[mask_region]
 
     print("after applying SR mask:")
     print("jets shape: ", jet_data.shape)
     print("constituents shape: ", constituents.shape)
+    print("highlevel features shape: ", highlevel_features.shape)
 
     # preprocessing of nan and inf values
     jet_data[np.isnan(jet_data)] = 0.0
@@ -150,6 +161,7 @@ def signal_prep(
     jet_data = jet_data[indices]
     constituents = constituents[indices]
     dijet_mass = dijet_mass[indices]
+    highlevel_features = highlevel_features[indices]
 
     # if num of events is less than required, raise error
     if jet_data.shape[0] < num_sig_for_data + num_sig_for_mc:
@@ -161,16 +173,24 @@ def signal_prep(
     jet_data_for_data = jet_data[:num_sig_for_data]
     constituents_for_data = constituents[:num_sig_for_data]
     dijet_mass_for_data = dijet_mass[:num_sig_for_data]
+    highlevel_features_for_data = highlevel_features[:num_sig_for_data]
     with h5py.File(output_dict["signals_for_data"].path, "w") as hf:
         hf.create_dataset("constituents", data=constituents_for_data)
         hf.create_dataset("global", data=jet_data_for_data)
         hf.create_dataset("condition", data=dijet_mass_for_data)
+        hf.create_dataset("highlevel_features", data=highlevel_features_for_data)
 
     # save for signals in mc
     jet_data_for_mc = jet_data[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
-    constituents_for_mc = constituents[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
+    constituents_for_mc = constituents[
+        num_sig_for_data : num_sig_for_data + num_sig_for_mc
+    ]
     dijet_mass_for_mc = dijet_mass[num_sig_for_data : num_sig_for_data + num_sig_for_mc]
+    highlevel_features_for_mc = highlevel_features[
+        num_sig_for_data : num_sig_for_data + num_sig_for_mc
+    ]
     with h5py.File(output_dict["signals_for_mc"].path, "w") as hf:
         hf.create_dataset("constituents", data=constituents_for_mc)
         hf.create_dataset("global", data=jet_data_for_mc)
         hf.create_dataset("condition", data=dijet_mass_for_mc)
+        hf.create_dataset("highlevel_features", data=highlevel_features_for_mc)
