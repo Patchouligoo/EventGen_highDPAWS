@@ -12,9 +12,108 @@ import h5py
 from data_processing.utils import get_dijetmass, get_mjj_mask
 
 
-def process_extra_qcdbkg(filename, outputpath, pad_size=-1, region="SR"):
+def process_highlevel_features(filepath):
+    # ---------------- process high level features ----------------
+    df_highlevel = pd.read_hdf(filepath)
 
-    df = pd.read_hdf(filename)
+    j_p4 = {}
+    # compute missing features
+    for ji in ["j1", "j2"]:
+        j_p4[ji] = ak.zip(
+            {
+                "px": df_highlevel[f"px{ji}"],
+                "py": df_highlevel[f"py{ji}"],
+                "pz": df_highlevel[f"pz{ji}"],
+                "m": df_highlevel[f"m{ji}"],
+            },
+            with_name="Momentum4D",
+        )
+        if f"pt{ji}" not in df_highlevel.columns:
+            df_highlevel[f"pt{ji}"] = j_p4[ji].pt
+            df_highlevel[f"eta{ji}"] = j_p4[ji].eta
+            df_highlevel[f"phi{ji}"] = j_p4[ji].phi
+            df_highlevel[f"N{ji}"] = 0
+        tau_mask = np.array(
+            (df_highlevel[f"tau1{ji}"] > 0) & (df_highlevel[f"tau2{ji}"] > 0)
+        )
+        df_highlevel[f"tau21{ji}"] = np.where(
+            tau_mask,
+            np.divide(
+                df_highlevel[f"tau2{ji}"], df_highlevel[f"tau1{ji}"], where=tau_mask
+            ),
+            0,
+        )
+        df_highlevel[f"tau32{ji}"] = np.where(
+            tau_mask,
+            np.divide(
+                df_highlevel[f"tau3{ji}"], df_highlevel[f"tau2{ji}"], where=tau_mask
+            ),
+            0,
+        )
+
+    # filter by label for mixed dataset
+    if "label" in df_highlevel.columns:
+        df_highlevel = df_highlevel[df_highlevel["label"] == 0]
+
+    highlevel_features = df_highlevel[
+        [
+            "mj1",
+            "mj2",
+            "tau2j1",
+            "tau1j1",
+            "tau2j2",
+            "tau1j2",
+            "tau3j1",
+            "tau2j1",
+            "tau3j2",
+            "tau2j2",
+        ]
+    ].values
+
+    # negative jet masses can occur due to jets represented as a single massless particle. We will set the negative masses to zero.
+    highlevel_features[:, :2][highlevel_features[:, :2] < 0] = 0.0
+
+    tau2j1_tau1j1 = highlevel_features[:, 2] / highlevel_features[:, 3]
+    tau2j2_tau1j2 = highlevel_features[:, 4] / highlevel_features[:, 5]
+    tau3j1_tau2j1 = highlevel_features[:, 6] / highlevel_features[:, 7]
+    tau3j2_tau2j2 = highlevel_features[:, 8] / highlevel_features[:, 9]
+
+    highlevel_features = np.concatenate(
+        [
+            highlevel_features[:, :2],
+            tau2j1_tau1j1[:, None],
+            tau2j2_tau1j2[:, None],
+            tau3j1_tau2j1[:, None],
+            tau3j2_tau2j2[:, None],
+        ],
+        axis=-1,
+    )
+
+    # set mass to log scale
+    highlevel_features[:, 0] = np.log(highlevel_features[:, 0])
+    highlevel_features[:, 1] = np.log(highlevel_features[:, 1])
+
+    print(
+        "num of nan or inf values: ",
+        np.sum(np.isnan(highlevel_features)),
+        np.sum(np.isinf(highlevel_features)),
+    )
+    # set any nan or inf values to 0
+    highlevel_features[np.isnan(highlevel_features)] = 0.0
+    highlevel_features[np.isinf(highlevel_features)] = 0.0
+
+    return highlevel_features
+
+
+def process_extra_qcdbkg(inputfiles, outputpath, pad_size=-1, region="SR"):
+
+    # ---------------- process high level features ----------------
+    highlevel_file_name = inputfiles["high_level"].path
+    highlevel_features = process_highlevel_features(highlevel_file_name)
+
+    # ---------------- process low level features ----------------
+    lowlevel_file_name = inputfiles["low_level"].path
+    df = pd.read_hdf(lowlevel_file_name)
 
     # drop all columns with high level features
     columns = df.columns
@@ -41,28 +140,25 @@ def process_extra_qcdbkg(filename, outputpath, pad_size=-1, region="SR"):
     del df
     gc.collect()
 
+    out_dict["highlevel_features"] = highlevel_features
+
     # apply SR mask, shuffle the data, and save to outputpath
     final_processing(out_dict, outputpath, region)
 
 
-def process_qcdbkg(filename, outputpath, pad_size=-1, region="SR", saved_result="bkg"):
+def process_qcdbkg(inputpath, outputpath, pad_size=-1, region="SR"):
 
-    processed_qcd_lowlevel = pd.read_hdf(filename)
+    # ---------------- process high level features ----------------
+    highlevel_features = process_highlevel_features(inputpath["high_level"].path)
 
-    if saved_result == "bkg":
-        # mask for bkg events with last columns to be 0
-        mask = processed_qcd_lowlevel.iloc[:, -1] == 0
-        processed_qcd_lowlevel = processed_qcd_lowlevel[mask]
-        # drop the last column
-        processed_qcd_lowlevel = processed_qcd_lowlevel.iloc[:, :-1]
-    elif saved_result == "signal":
-        # mask for signal events with last columns to be 1
-        mask = processed_qcd_lowlevel.iloc[:, -1] == 1
-        processed_qcd_lowlevel = processed_qcd_lowlevel[mask]
-        # drop the last column
-        processed_qcd_lowlevel = processed_qcd_lowlevel.iloc[:, :-1]
-    else:
-        raise ValueError("saved_result should be either 'bkg' or 'signal'")
+    # ---------------- process low level features ----------------
+    processed_qcd_lowlevel = pd.read_hdf(inputpath["low_level"].path)
+
+    # mask for bkg events with last columns to be 0
+    mask = processed_qcd_lowlevel.iloc[:, -1] == 0
+    processed_qcd_lowlevel = processed_qcd_lowlevel[mask]
+    # drop the last column
+    processed_qcd_lowlevel = processed_qcd_lowlevel.iloc[:, :-1]
 
     print(processed_qcd_lowlevel.describe())
 
@@ -71,6 +167,8 @@ def process_qcdbkg(filename, outputpath, pad_size=-1, region="SR", saved_result=
     # clean the memory
     del processed_qcd_lowlevel
     gc.collect()
+
+    out_dict["highlevel_features"] = highlevel_features
 
     final_processing(out_dict, outputpath, region)
 
@@ -244,6 +342,7 @@ def final_processing(out_dict, output_path, region="SR"):
     constituents = out_dict["constituents"]
     jet_data = out_dict["global"]
     dijet_mass = out_dict["condition"]
+    highlevel_features = out_dict["highlevel_features"]
 
     mask_region = get_mjj_mask(dijet_mass)
 
@@ -251,15 +350,18 @@ def final_processing(out_dict, output_path, region="SR"):
         constituents = constituents[mask_region]
         jet_data = jet_data[mask_region]
         dijet_mass = dijet_mass[mask_region]
+        highlevel_features = highlevel_features[mask_region]
 
     else:
         constituents = constituents[~mask_region]
         jet_data = jet_data[~mask_region]
         dijet_mass = dijet_mass[~mask_region]
+        highlevel_features = highlevel_features[~mask_region]
 
     print(f"after applying {region} mask:")
     print("jets shape: ", jet_data.shape)
     print("constituents shape: ", constituents.shape)
+    print("highlevel features shape: ", highlevel_features.shape)
 
     np.random.seed(42)
     indices = np.arange(jet_data.shape[0])
@@ -267,12 +369,14 @@ def final_processing(out_dict, output_path, region="SR"):
     jet_data = jet_data[indices]
     constituents = constituents[indices]
     dijet_mass = dijet_mass[indices]
+    highlevel_features = highlevel_features[indices]
 
     # save to outputpath
     with h5py.File(output_path, "w") as hf:
         hf.create_dataset("constituents", data=constituents)
         hf.create_dataset("global", data=jet_data)
         hf.create_dataset("condition", data=dijet_mass)
+        hf.create_dataset("highlevel_features", data=highlevel_features)
 
 
 # define a helper function to sort ak.Array by pt
